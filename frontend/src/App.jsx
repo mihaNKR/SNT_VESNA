@@ -1,49 +1,55 @@
 import React, { useState, useEffect } from "react";
+import LoginForm from "./components/LoginForm";
+import MeterForm from "./components/MeterForm";
+import MeterList from "./components/MeterList";
 import axios from "axios";
 
 function App() {
-  const [userId, setUserId] = useState("");
-  const [meterValue, setMeterValue] = useState("");
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [readings, setReadings] = useState([]);
 
-  const fetchReadings = async () => {
-    if (!userId) return;
-    const res = await axios.get(`http://localhost:3001/api/meters/${userId}`);
+  useEffect(() => {
+    if (token) {
+      // Получаем пользователя и показания
+      axios.get("/api/me", { headers: { Authorization: token } })
+        .then(res => setUser(res.data))
+        .catch(() => setToken(""));
+      axios.get("/api/meters", { headers: { Authorization: token } })
+        .then(res => setReadings(res.data));
+    }
+  }, [token]);
+
+  const handleLogin = async (email, password) => {
+    const res = await axios.post("/api/login", { email, password });
+    setToken(res.data.token);
+    localStorage.setItem("token", res.data.token);
+  };
+
+  const handleLogout = () => {
+    setToken("");
+    localStorage.removeItem("token");
+    setUser(null);
+    setReadings([]);
+  };
+
+  const handleAddReading = async (value) => {
+    await axios.post("/api/meters", { value }, { headers: { Authorization: token } });
+    // Обновить список показаний
+    const res = await axios.get("/api/meters", { headers: { Authorization: token } });
     setReadings(res.data);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    await axios.post('http://localhost:3001/api/meters', { userId, meterValue });
-    setMeterValue("");
-    fetchReadings();
-  };
+  if (!token) {
+    return <LoginForm onLogin={handleLogin} />;
+  }
 
   return (
     <div style={{ padding: 20 }}>
       <h2>Личный кабинет садовода</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          placeholder="Ваш ID (из 1С)"
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-        />
-        <input
-          placeholder="Показание счётчика"
-          value={meterValue}
-          onChange={(e) => setMeterValue(e.target.value)}
-          type="number"
-        />
-        <button type="submit">Отправить показание</button>
-      </form>
-      <button onClick={fetchReadings} disabled={!userId}>Показать мои показания</button>
-      <ul>
-        {readings.map((r) => (
-          <li key={r.Ref_Key}>
-            {r.Дата}: {r.Значение}
-          </li>
-        ))}
-      </ul>
+      <button onClick={handleLogout}>Выйти</button>
+      <MeterForm onAdd={handleAddReading} />
+      <MeterList readings={readings} />
     </div>
   );
 }
