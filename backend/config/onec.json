@@ -1,1 +1,5 @@
-
+{
+  "odata_url": "https://your-1c-server/odata/standard.odata/",
+  "login": "1c_user",
+  "password": "1c_password"
+}
